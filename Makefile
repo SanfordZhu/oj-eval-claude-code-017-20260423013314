@@ -1,5 +1,5 @@
 CXX=g++
-CXXFLAGS=-O2 -std=gnu++17 -pipe -static -s
+CXXFLAGS=-O2 -std=gnu++17 -pipe
 LDFLAGS=
 
 all: code
