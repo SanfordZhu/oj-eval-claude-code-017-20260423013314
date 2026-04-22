@@ -161,6 +161,66 @@ int main(){
                 }
                 if(i<t.stationNum-1){ add_minutes(m,dn,hr,mi, t.travelTimes[i]); price_cum += t.prices[i]; }
             }
+        } else if(cmd=="query_ticket"){
+            string s,tgt,d, pref="cost"; istringstream ss(line); string tok;
+            while(ss>>tok){ if(tok=="-s") ss>>s; else if(tok=="-t") ss>>tgt; else if(tok=="-d") ss>>d; else if(tok=="-p") ss>>pref; }
+            int dm=(d.size()>=5? (d[0]-'0')*10+(d[1]-'0'):0); int dd=(d.size()>=5? (d[3]-'0')*10+(d[4]-'0'):0);
+            // collect matches
+            int res_idx[1000]; int res_price[1000]; int res_time[1000]; string res_id[1000]; string res_from[1000]; string res_to[1000];
+            int res_dep_m[1000], res_dep_d[1000], res_dep_hr[1000], res_dep_mi[1000];
+            int res_arr_m[1000], res_arr_d[1000], res_arr_hr[1000], res_arr_mi[1000];
+            int res_seat[1000]; int R=0;
+            for(int ti=0; ti<train_count; ti++){
+                Train &tr = trains[ti]; if(!tr.released) continue;
+                // find station indices
+                int i=-1,j=-1; for(int k=0;k<tr.stationNum;k++){ if(tr.stations[k]==s){ i=k; break; } }
+                for(int k=i+1;k<tr.stationNum;k++){ if(tr.stations[k]==tgt){ j=k; break; } }
+                if(i==-1 || j==-1) continue;
+                // offset minutes to departure at station i
+                int off=0; for(int k=0;k<i;k++){ off += tr.travelTimes[k]; if(k<i-1) off += tr.stopoverTimes[k]; }
+                if(i>0) off += tr.stopoverTimes[i-1];
+                // earliest and latest boarding dates
+                int em=tr.sale_start_m, ed=tr.sale_start_d, ehr=tr.start_hr, emi=tr.start_mi; add_minutes(em,ed,ehr,emi, off);
+                int lm=tr.sale_end_m, ld=tr.sale_end_d, lhr=tr.start_hr, lmi=tr.start_mi; add_minutes(lm,ld,lhr,lmi, off);
+                if(cmp_date(dm,dd,em,ed)<0 || cmp_date(dm,dd,lm,ld)>0) continue;
+                // departure time at i
+                int dhr=tr.start_hr, dmi=tr.start_mi; add_minutes(dhr,dmi,dhr,dmi, off - (dhr*60+dmi)); // simplify: compute time-of-day
+                // better: compute time-of-day directly
+                int dep_total = (tr.start_hr*60+tr.start_mi + off) % (24*60);
+                dhr = dep_total/60; dmi = dep_total%60;
+                // arrival at j
+                int arr_m=dm, arr_d=dd, arr_hr=dhr, arr_mi=dmi; int arr_off=0; for(int k=i; k<j; k++){ arr_off += tr.travelTimes[k]; if(k<j-1) arr_off += tr.stopoverTimes[k]; }
+                add_minutes(arr_m,arr_d,arr_hr,arr_mi, arr_off);
+                // price
+                int price=0; for(int k=i;k<j;k++) price+=tr.prices[k];
+                res_idx[R]=ti; res_price[R]=price; res_time[R]=arr_off; res_id[R]=tr.id; res_from[R]=tr.stations[i]; res_to[R]=tr.stations[j];
+                res_dep_m[R]=dm; res_dep_d[R]=dd; res_dep_hr[R]=dhr; res_dep_mi[R]=dmi;
+                res_arr_m[R]=arr_m; res_arr_d[R]=arr_d; res_arr_hr[R]=arr_hr; res_arr_mi[R]=arr_mi;
+                res_seat[R]=tr.seatNum; R++;
+            }
+            // sort
+            for(int a=1;a<R;a++){
+                int b=a; while(b>0){ bool swap=false;
+                    if(pref=="time"){ if(res_time[b] < res_time[b-1]) swap=true; else if(res_time[b]==res_time[b-1] && res_id[b] < res_id[b-1]) swap=true; }
+                    else { if(res_price[b] < res_price[b-1]) swap=true; else if(res_price[b]==res_price[b-1] && res_id[b] < res_id[b-1]) swap=true; }
+                    if(swap){
+                        // swap all fields
+                        #define SWAP(x) do{ auto tmp=x[b]; x[b]=x[b-1]; x[b-1]=tmp; }while(0)
+                        SWAP(res_idx); SWAP(res_price); SWAP(res_time); SWAP(res_id); SWAP(res_from); SWAP(res_to);
+                        SWAP(res_dep_m); SWAP(res_dep_d); SWAP(res_dep_hr); SWAP(res_dep_mi);
+                        SWAP(res_arr_m); SWAP(res_arr_d); SWAP(res_arr_hr); SWAP(res_arr_mi);
+                        SWAP(res_seat);
+                        #undef SWAP
+                        b--;
+                    } else break;
+                }
+            }
+            cout<<R<<"\n";
+            for(int r=0;r<R;r++){
+                char dep[32]; snprintf(dep,sizeof(dep), "%02d-%02d %02d:%02d", res_dep_m[r],res_dep_d[r],res_dep_hr[r],res_dep_mi[r]);
+                char arr[32]; snprintf(arr,sizeof(arr), "%02d-%02d %02d:%02d", res_arr_m[r],res_arr_d[r],res_arr_hr[r],res_arr_mi[r]);
+                cout<<res_id[r]<<' '<<res_from[r]<<' '<<dep<<" -> "<<res_to[r]<<' '<<arr<<' '<<res_price[r]<<' '<<res_seat[r]<<"\n";
+            }
         } else {
             cout<<-1<<"\n";
         }
