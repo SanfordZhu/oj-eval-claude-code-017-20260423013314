@@ -1,0 +1,10 @@
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+# Makefile
+# OJ will generate a Makefile via cmake; keep ours tracked
+# (We rely on git to include it)
+#
+# Do not ignore Makefile here.
+
+code
